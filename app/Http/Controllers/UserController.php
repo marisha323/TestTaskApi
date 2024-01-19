@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\File;
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\DomCrawler\Crawler;
 class UserController extends Controller
 {
     public function showForm()
@@ -15,7 +16,16 @@ class UserController extends Controller
         return view('index');
     }
 
-
+    public function getHtmlFromUrl($url)
+    {
+        $client = new Client();
+        try {
+            $response = $client->get($url);
+            return $response->getBody()->getContents();
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
     public function processForm(Request $request)
     {
         $validatedData = $request->validate([
@@ -24,57 +34,45 @@ class UserController extends Controller
             'age' => 'required|integer|min:0',
             'audio_url' => 'required|url',
         ]);
-
         $apiUrl = "https://neuron-systems.com/api/test";
         //$apiUrl = "http://127.0.0.1:8000/api/test";
         $response = Http::post($apiUrl,$validatedData);
-
-        // Путь к файлу лога
         $logFilePath = storage_path("logs/{$validatedData['name']}_api.log");
-
-        // Создать файл лога, если он не существует
         if (!file_exists($logFilePath)) {
             file_put_contents($logFilePath, '');
         }
-
-
-
-        // Обработка ответа от API
         if ($response->successful()) {
             $apiData = $response->json();
-
-            // Проверка на наличие данных в ответе
             if (!empty($apiData)) {
-                // Успешно полученные данные записать в лог в отдельный файл
                 $logContent = "API Response for {$validatedData['name']}: " . json_encode($apiData) . PHP_EOL;
-
-                // Добавить данные в файл лога
                 file_put_contents($logFilePath, $logContent, FILE_APPEND);
-
                 Log::channel('api')->info($logContent);
             } else {
-                // Обработка случая, когда ответ пустой
                 $logContent = "API Response for {$validatedData['name']} is empty." . PHP_EOL;
-
-                // Добавить информацию в файл лога
                 file_put_contents($logFilePath, $logContent, FILE_APPEND);
-
                 Log::channel('api')->warning($logContent);
             }
         } else {
-            // Обработка ошибок при взаимодействии с API
             $errorLog = "Error while sending data to API. HTTP Status: {$response->status()}" . PHP_EOL;
-
-            // Добавить ошибку в файл лога
             file_put_contents($logFilePath, $errorLog, FILE_APPEND);
-
             Log::error($errorLog);
         }
-        // Получить данные из файла лога
         $logData = File::exists($logFilePath) ? File::get($logFilePath) : null;
         $welcomeMessage = $this->getWelcomeMessage($validatedData);
         $ageCategory = $this->getAgeCategory($validatedData['age']);
-        $audioFileName = $this->downloadAndSaveAudio($validatedData['audio_url'], $validatedData['name']);
+        $html = $this->getHtmlFromUrl($validatedData['audio_url']);
+        if ($html) {
+            $crawler = new Crawler($html);
+            $track = $crawler->filter('.loadbtnjs')->first()->attr('data-file-track');
+            if ($track) {
+                $url = 'https://muzflix.net/' . $track;
+            } else {
+                echo "Трек не знайдено";
+            }
+        } else {
+            return redirect()->back()->withErrors(['url' => 'Не вдалося отримати HTML-код сторінки']);
+        }
+        $audioFileName=$this->downloadAndSaveAudio($url, $validatedData['name']);;
         return view('result', [
             'welcomeMessage' => $welcomeMessage,
             'ageCategory' => $ageCategory,
@@ -87,38 +85,28 @@ class UserController extends Controller
     private function downloadAndSaveAudio($audioUrl, $name)
     {
         $client = new Client();
-
-        // Отримайте аудіозапис та збережіть його
         $response = $client->get($audioUrl);
-
-        // Отримайте інформацію про файл із заголовка відповіді
-        $filename = $response->getHeader('Content-Disposition')[0] ?? null;
-
-        // Якщо ім'я файлу відсутнє, використовуйте унікальне ім'я на основі ім'я користувача
+        $filename ='';
         if (!$filename) {
-            $extension = pathinfo($audioUrl, PATHINFO_EXTENSION);
-            $filename = $name . '_' . uniqid() . '.' . $extension;
+            $filename = $name .'_' . uniqid() .'.mp3';
+        } else {
+            $filename = pathinfo($filename, PATHINFO_FILENAME) . '.mp3';
         }
-
-        // Визначте каталог для збереження аудіозаписів у сховищі Laravel
-        $audioDirectory = 'audio';
-
-        // Отримайте реальний шлях до потоку
-        $streamMeta = stream_get_meta_data($response->getBody()->detach());
-        $streamPath = $streamMeta['uri'];
-
-        // Збережіть аудіозапис в сховище Laravel
-        $path = Storage::disk('public')->putFileAs($audioDirectory, $streamPath, $filename);
-
-        // Поверніть ім'я файлу або null у випадку невдачі
-        return  $filename;
+        $audioDirectory = 'public\audio';
+        try {
+            $filePath = $audioDirectory . '/' . $filename;
+            Storage::put($filePath, $response->getBody()->getContents());
+            return $filePath;
+        } catch (\Exception $e) {
+            Log::error('Error saving file: ' . $e->getMessage());
+            return false;
+        }
     }
     private function getWelcomeMessage($data)
     {
         $genderSalutation = ($data['gender'] == 'male') ? 'Mr.' : 'Ms.';
         return "Hello, $genderSalutation {$data['name']}!";
     }
-
     private function getAgeCategory($age)
     {
         if ($age < 18) {
