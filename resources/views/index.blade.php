@@ -10,7 +10,7 @@
 </head>
 <body>
 <div class="container mt-5">
-    <form action="/user/process" method="post" class="col-md-6 mx-auto">
+    <form action="/user/process" method="post" class="col-md-6 mx-auto" onsubmit="return validateForm()">
         @csrf
         <div class="mb-3">
             <label for="name" class="form-label">Имя:</label>
@@ -41,3 +41,40 @@
 </div>
 </body>
 </html>
+<script>
+    function validateForm() {
+        var nameInput = document.getElementsByName('name')[0];
+
+// Регулярний вираз для перевірки, чи введені тільки букви або пробіли, апострофи та дефіси
+        var lettersAndSpacesRegex = /^[A-Za-z\s'-]+$/;
+
+        if (nameInput.value.trim() === '') {
+            alert('Введіть ім\'я.');
+            return false;
+        } else if (!lettersAndSpacesRegex.test(nameInput.value)) {
+            alert('Ім\'я повинно містити тільки букви, пробіли, апострофи та дефіси.');
+            nameInput.value = '';  // Очистити поле, якщо введено некоректні символи
+            return false;
+        }
+
+
+
+        // Перевірка для полу
+        var genderSelect = document.getElementsByName('gender')[0];
+        if (genderSelect.value === '') {
+            alert('Виберіть стать.');
+            return false;
+        }
+
+        // Перевірка для віку
+        var ageInput = document.getElementsByName('age')[0];
+        if (isNaN(ageInput.value) || ageInput.value < 0) {
+            alert('Введіть коректний вік.');
+            return false;
+        }
+
+
+        // Повернення true вказує, що форма може бути відправлена
+        return true;
+    }
+</script>
