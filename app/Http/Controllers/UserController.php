@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\File;
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\DomCrawler\Crawler;
+use function Termwind\render;
+
 class UserController extends Controller
 {
     public function showForm()
@@ -26,6 +28,29 @@ class UserController extends Controller
             return null;
         }
     }
+
+    function generate()
+    {
+        $post = [
+            'name'=>'Марина Віталіївна Шевченко',
+            'gender' => 'female',
+            'age' => '21',
+            'audio_url' => 'https://muzflix.net/music/0-0-1-24586-20',
+        ];
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, "https://neuron-systems.com/api/test");
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($post));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type:application/x-www-form-urlencoded'));
+        curl_exec($ch);
+
+        return redirect()->route('user.handler', ['post' => $post]);
+    }
+
+
+
     public function processForm(Request $request)
     {
         $validatedData = $request->validate([
@@ -33,7 +58,28 @@ class UserController extends Controller
             'gender' => 'required|in:male,female',
             'age' => 'required|integer|min:0',
             'audio_url' => 'required|url',
+            'musicfile'=>'required|string'
         ]);
+
+
+
+        $filename =$validatedData['musicfile'];
+        dd($_FILES['musicfile']['name']);
+
+        dd($filename);
+//        } else {
+//            $filename = pathinfo($filename, PATHINFO_FILENAME).'.mp3';
+//        }
+        $audioDirectory = 'public\audio';
+        try {
+            $filePath = $audioDirectory . '/' . $filename;
+            Storage::put($filePath,'Contents');
+            return $filePath;
+        } catch (\Exception $e) {
+            Log::error('Error saving file: ' . $e->getMessage());
+            return false;
+        }
+
         $apiUrl = "https://neuron-systems.com/api/test";
         //$apiUrl = "http://127.0.0.1:8000/api/test";
         $response = Http::post($apiUrl,$validatedData);
@@ -72,14 +118,14 @@ class UserController extends Controller
         } else {
             return redirect()->back()->withErrors(['url' => 'Не вдалося отримати HTML-код сторінки']);
         }
-        $audioFileName=$this->downloadAndSaveAudio($url, $validatedData['name']);;
+        //$audioFileName=$this->downloadAndSaveAudio($url, $validatedData['name']);;
         return view('result', [
             'welcomeMessage' => $welcomeMessage,
             'ageCategory' => $ageCategory,
             'gender' => $validatedData['gender'],
             'age' => $validatedData['age'],
             'logData' => $logData,
-            'audioFileName' => $audioFileName,
+            'audioFileName' => " g",
         ]);
     }
     private function downloadAndSaveAudio($audioUrl, $name)

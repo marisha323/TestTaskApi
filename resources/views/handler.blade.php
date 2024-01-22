@@ -8,13 +8,6 @@
     <title>Document</title>
 </head>
 <body>
-<h1>Result Page</h1>
 
-<p>{{ $audioFileName }}</p>
-
-@if ($logData)
-    <h2>API Log Data</h2>
-    <pre>{{ $logData }}</pre>
-@endif
 </body>
 </html>

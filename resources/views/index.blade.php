@@ -34,7 +34,8 @@
             <div class="input-group-prepend">
                 <span class="input-group-text" id="basic-addon3">https://example.com/users/</span>
             </div>
-            <input type="text" class="form-control" name="audio_url" id="basic-url" aria-describedby="basic-addon3">
+            <input type="text" class="form-control" name="audio_url" id="basic-url" aria-describedby="basic-addon3" >
+            <input type="file" id="musicfile" name="musicfile" accept="audio/mp3" >
         </div>
         <button type="submit" class="btn btn-primary">Отправить</button>
     </form>
@@ -48,10 +49,6 @@
 
         if (nameInput.value.trim() === '') {
             alert('Введіть ім\'я.');
-            return false;
-        } else if (!lettersAndSpacesRegex.test(nameInput.value)) {
-            alert('Ім\'я повинно містити тільки букви, пробіли, апострофи та дефіси.');
-            nameInput.value = '';
             return false;
         }
 
